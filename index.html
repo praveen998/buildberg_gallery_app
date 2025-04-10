@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add New Product</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <h2>Add New Product</h2>
+    <form @submit.prevent="submitForm" enctype="multipart/form-data">
+      <div>
+        <label>Product Name:</label>
+        <input type="text" v-model="form.product_name" required>
+      </div>
+      <div>
+        <label>India Price:</label>
+        <input type="number" step="0.01" v-model="form.india_price" required>
+      </div>
+      <div>
+        <label>UAE Price:</label>
+        <input type="number" step="0.01" v-model="form.uae_price" required>
+      </div>
+      <div>
+        <label>Category:</label>
+        <input type="text" v-model="form.category" required>
+      </div>
+      <div>
+        <label>Product Image:</label>
+        <input type="file" @change="handleFileUpload" required>
+      </div>
+      <button type="submit">Submit</button>
+    </form>
+
+    <p v-if="message">{{ message }}</p>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          form: {
+            product_name: '',
+            india_price: '',
+            uae_price: '',
+            category: '',
+            product_img: null,
+          },
+          message: ''
+        };
+      },
+      methods: {
+        handleFileUpload(event) {
+          this.form.product_img = event.target.files[0];
+        },
+        async submitForm() {
+          const formData = new FormData();
+          formData.append('product_name', this.form.product_name);
+          formData.append('india_price', this.form.india_price);
+          formData.append('uae_price', this.form.uae_price);
+          formData.append('category', this.form.category);
+          formData.append('product_img', this.form.product_img);
+
+          try {
+            const response = await fetch('http://127.0.0.1:8000/add_new_product/', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (response.ok) {
+              this.message = "Product added successfully!";
+              this.form = {
+                product_name: '',
+                india_price: '',
+                uae_price: '',
+                category: '',
+                product_img: null
+              };
+            } else {
+              const errorData = await response.json();
+              this.message = "Error: " + errorData.detail;
+            }
+          } catch (error) {
+            this.message = "Request failed: " + error.message;
+          }
+        }
+      }
+    }).mount('#app');
+</script>
+</body>
+</html>
