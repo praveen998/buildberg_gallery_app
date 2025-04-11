@@ -35,6 +35,11 @@
 
     <p v-if="message">{{ message }}</p>
   </div>
+  <br><br>
+  <div id="app2">
+    <h2>admin login</h2>
+
+  </div>
 
   <script>
     const { createApp } = Vue;
@@ -65,7 +70,7 @@
           formData.append('product_img', this.form.product_img);
 
           try {
-            const response = await fetch('http://127.0.0.1:8000/add_new_product/', {
+            const response = await fetch('http://127.0.0.1:8000/upload_image/', {
               method: 'POST',
               body: formData,
             });
