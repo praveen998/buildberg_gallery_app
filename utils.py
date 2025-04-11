@@ -33,4 +33,12 @@ class Hashing:
 # print("hashpass:", hashe)
 # check = asyncio.run(Hashing.verify_password("praveen1234","$2b$12$JWB2ZwXPiu9Nr6c/jOxx7OGgycGOi5/1NfSj3HldcW6IkKcQUjviK"))
 # print(check)
-
+from fastapi import HTTPException
+async def Auhtentication(authorization:str,password_hash):
+    print(password_hash )
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or missing Authorization header")
+    token = authorization.split(" ")[1]
+    if token != password_hash:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"message": "Token is valid"}    

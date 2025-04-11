@@ -36,13 +36,99 @@
     <p v-if="message">{{ message }}</p>
   </div>
   <br><br>
+
+
+
+
   <div id="app2">
-    <h2>admin login</h2>
+    <h2>Admin Login</h2>
+    <form @submit.prevent="login">
+      <label for="username">Username:</label><br>
+      <input type="text" v-model="username" required><br><br>
 
+      <label for="password">Password:</label><br>
+      <input type="password" v-model="password" required><br><br>
+
+      <button type="submit">Login</button>
+    </form>
+
+    <div v-if="message">
+      <p>{{ message }}</p>
+      <p v-if="hash">Stored hash: {{ hash }}</p>
+    </div>
   </div>
+  <br><br>
 
+
+  <div id="app3">
+    <h2>Token Validator</h2>
+    <button @click="validateToken">Validate Token</button>
+    <div v-if="message">
+      <p>{{ message }}</p>
+    </div>
+  </div>
   <script>
     const { createApp } = Vue;
+
+    createApp({
+      data(){
+        return{
+             message: ''
+        };
+
+      },
+      methods:{
+        async validateToken() {
+          const token = sessionStorage.getItem("adminHash");
+          if (!token) {
+            this.message = "No token found in session storage.";
+            return;
+          }
+          try {
+            const response = await axios.post('http://localhost:8000/validate_token/', {}, {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            });
+
+            this.message = response.data.message;
+          } catch (error) {
+            this.message = error.response?.data?.detail || "Token validation failed.";
+          }
+        }
+      }
+    }).mount("#app3");
+
+    createApp({
+      data(){
+        return{
+        username: '',
+        password: '',
+        message: '',
+        hash: ''
+        };
+      },
+      methods:{
+        async login() {
+          try {
+            const response = await axios.post('http://localhost:8000/adminlogin/', {
+              username: this.username,
+              password: this.password
+            });
+
+            this.message = response.data.message;
+            this.hash = response.data.hash;
+
+            // Store the hash in sessionStorage
+            sessionStorage.setItem('adminHash', this.hash);
+          } catch (error) {
+            this.message = error.response?.data?.detail || 'Login failed';
+            this.hash = '';
+          }
+        }
+      }
+
+    }).mount("#app2");
 
     createApp({
       data() {

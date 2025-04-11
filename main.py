@@ -1,4 +1,4 @@
-from fastapi import FastAPI,HTTPException,Request,Form, File, UploadFile
+from fastapi import FastAPI,HTTPException,Request,Form, File, UploadFile,Header
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -135,7 +135,6 @@ async def upload_image(
         "category": category,
         "product_image_url": filename
     }
-
     return {"message": f"{filename}"}
 
 
@@ -145,14 +144,14 @@ class AdminLoginRequest(BaseModel):
 
 
 from utils import Hashing
+
 @app.post("/adminlogin/")
 async def adminlogin(data:AdminLoginRequest):
     global password_hash
     username = data.username
     password = data.password
-
     if username != os.getenv("admin_username") or password != os.getenv("admin_password"):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Invalid_credentials")
 
     hashed=await Hashing.hash_password(password)
     password_hash=hashed
@@ -163,3 +162,12 @@ async def adminlogin(data:AdminLoginRequest):
 async def gethash():
     global password_hash
     return {"hash": password_hash}
+
+
+from utils import Auhtentication
+@app.post("/validate_token/")
+async def validate_token(authorization: str = Header(None)):
+    global password_hash
+    result=await Auhtentication(authorization,password_hash)
+
+    return result
