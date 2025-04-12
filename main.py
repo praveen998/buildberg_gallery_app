@@ -6,7 +6,7 @@ import boto3
 import botocore.exceptions
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
-
+from database import SessionLocal,Gallery
 
 app = FastAPI(title="My FastAPI Project")
 
@@ -36,6 +36,8 @@ s3_client = boto3.client(
     region_name=AWS_REGION,
 )
 
+db= SessionLocal()
+
 
 # async def uploadimage_to_aws(s3client,S3_BUCKET_NAME,product_img):
 #         file_content = await product_img.read()
@@ -48,6 +50,7 @@ s3_client = boto3.client(
 #             )
 #         file_url = f"https://{S3_BUCKET_NAME}.s3.{s3_client.meta.region_name}.amazonaws.com/{file_key}"
 #         return file_url
+
 
 async def uploadimage_to_aws(s3client, S3_BUCKET_NAME, product_img):
     try:
@@ -117,25 +120,38 @@ async def root():
 
 @app.post("/upload_image/")
 async def upload_image(
-    product_name: str = Form(...),
-    india_price: float = Form(...),
-    uae_price: float = Form(...),
-    category: str = Form(...),
+    site_name: str = Form(...),
+    client_name: str = Form(...),
+    building_square_feet: float = Form(...),
     product_img: UploadFile = File(...)
     ): 
-    print("product file name:",product_img)
-    filename=await uploadimage_to_aws(s3_client,S3_BUCKET_NAME,product_img)
-    print("aws file url:",filename)
-    product={
-        "product_name": product_name,
-        "product_price": {
-            "India": india_price,
-            "UAE": uae_price
-        },
-        "category": category,
-        "product_image_url": filename
-    }
-    return {"message": f"{filename}"}
+    #filename=await uploadimage_to_aws(s3_client,S3_BUCKET_NAME,product_img)
+    #print("aws file url:",filename)
+    print(site_name)
+    print(client_name)
+    print(building_square_feet)
+    print(product_img.filename)
+
+    try:
+        new_gallery = Gallery(
+        site=site_name,
+        square_feet=building_square_feet,
+        name=client_name,
+        image_url=product_img.filename
+        )
+        db.add(new_gallery)
+        db.commit()
+        db.refresh(new_gallery)
+        print("Inserted User ID:", new_gallery.id)
+
+    except Exception as e:
+        db.rollback()  # Rollback if there's an error
+        raise HTTPException(status_code=401, detail=f"Error inserting user:{ e}")
+
+    finally:
+        db.close()  # Always close the session
+
+    return {"message": f"gallery_id:{new_gallery.id}"}
 
 
 class AdminLoginRequest(BaseModel):
@@ -169,5 +185,32 @@ from utils import Auhtentication
 async def validate_token(authorization: str = Header(None)):
     global password_hash
     result=await Auhtentication(authorization,password_hash)
-
     return result
+
+
+@app.get("/gethash")
+async def gethash():
+    global password_hash
+    return {"hash": password_hash}
+
+
+@app.get("/getgallery/")
+async def getgallery():
+    try:
+        galleries = db.query(Gallery).all()
+        print(galleries[0])
+        print(f"type:{type(galleries[0])}")
+        gallery_data=[]
+        for gallery in galleries:
+            d= {"id": gallery.id,"name": gallery.name,"site": gallery.site,"square_feet": gallery.square_feet,"image_url": gallery.image_url
+            }
+            gallery_data.append(d)
+            # print(f"ID: {gallery.id}, Name: {gallery.name}, Site: {gallery.site}, Sqft: {gallery.square_feet}, Image URL: {gallery.image_url}")
+
+    except Exception as e:
+        print("Error:", e)
+
+    finally:
+        db.close()
+
+    return {"message": f"gallery:{gallery_data}"}

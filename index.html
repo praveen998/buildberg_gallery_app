@@ -11,20 +11,16 @@
     <h2>Add New Product</h2>
     <form @submit.prevent="submitForm" enctype="multipart/form-data">
       <div>
-        <label>Product Name:</label>
-        <input type="text" v-model="form.product_name" required>
+        <label>site_name:</label>
+        <input type="text" v-model="form.site_name" required>
       </div>
       <div>
-        <label>India Price:</label>
-        <input type="number" step="0.01" v-model="form.india_price" required>
+        <label>building_square_feet:</label>
+        <input type="number" step="0.01" v-model="form.building_square_feet" required>
       </div>
       <div>
-        <label>UAE Price:</label>
-        <input type="number" step="0.01" v-model="form.uae_price" required>
-      </div>
-      <div>
-        <label>Category:</label>
-        <input type="text" v-model="form.category" required>
+        <label>client_name:</label>
+        <input type="text" v-model="form.client_name" required>
       </div>
       <div>
         <label>Product Image:</label>
@@ -80,10 +76,12 @@
       methods:{
         async validateToken() {
           const token = sessionStorage.getItem("adminHash");
-          if (!token) {
+          if (!token) 
+          {
             this.message = "No token found in session storage.";
             return;
           }
+          
           try {
             const response = await axios.post('http://localhost:8000/validate_token/', {}, {
               headers: {
@@ -134,10 +132,9 @@
       data() {
         return {
           form: {
-            product_name: '',
-            india_price: '',
-            uae_price: '',
-            category: '',
+            site_name: '',
+            building_square_feet: '',
+            client_name: '',
             product_img: null,
           },
           message: ''
@@ -149,10 +146,9 @@
         },
         async submitForm() {
           const formData = new FormData();
-          formData.append('product_name', this.form.product_name);
-          formData.append('india_price', this.form.india_price);
-          formData.append('uae_price', this.form.uae_price);
-          formData.append('category', this.form.category);
+          formData.append('site_name', this.form.site_name);
+          formData.append('building_square_feet', this.form.building_square_feet);
+          formData.append('client_name', this.form.client_name);
           formData.append('product_img', this.form.product_img);
 
           try {
@@ -164,10 +160,9 @@
             if (response.ok) {
               this.message = "Product added successfully!";
               this.form = {
-                product_name: '',
-                india_price: '',
-                uae_price: '',
-                category: '',
+                site_name: '',
+                building_square_feet: '',
+                client_name: '',
                 product_img: null
               };
             } else {

@@ -6,7 +6,7 @@ import os
 
 load_dotenv()
 host = os.getenv("host")
-port = int(os.getenv("port"))  # Convert to integer
+port = int(os.getenv("port")) 
 user = os.getenv("user")
 password = os.getenv("password")
 db = os.getenv("db")

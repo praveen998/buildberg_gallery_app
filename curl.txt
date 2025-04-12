@@ -4,3 +4,6 @@ curl -X POST http://127.0.0.1:8000/adminlogin/ \
 
 
 curl -X GET http://127.0.0.1:8000/gethash
+
+
+curl -X GET http://127.0.0.1:8000/getgallery/
