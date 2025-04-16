@@ -118,18 +118,22 @@ async def root():
     return {"message": "Hello, FastAPI!"}
 
 
+from datetime import datetime
 @app.post("/upload_image/")
 async def upload_image(
     site_name: str = Form(...),
     client_name: str = Form(...),
     building_square_feet: float = Form(...),
+    date:str=Form(...),
     product_img: UploadFile = File(...)
     ): 
+    work_date_obj = datetime.strptime(date, "%Y-%m-%d").date()
     #filename=await uploadimage_to_aws(s3_client,S3_BUCKET_NAME,product_img)
     #print("aws file url:",filename)
     print(site_name)
     print(client_name)
     print(building_square_feet)
+    print(str(work_date_obj))
     print(product_img.filename)
 
     try:
@@ -137,7 +141,8 @@ async def upload_image(
         site=site_name,
         square_feet=building_square_feet,
         name=client_name,
-        image_url=product_img.filename
+        image_url=product_img.filename,
+        date=str(work_date_obj)
         )
         db.add(new_gallery)
         db.commit()
@@ -185,6 +190,7 @@ from utils import Auhtentication
 async def validate_token(authorization: str = Header(None)):
     global password_hash
     result=await Auhtentication(authorization,password_hash)
+    print(result)
     return result
 
 
@@ -193,24 +199,51 @@ async def gethash():
     global password_hash
     return {"hash": password_hash}
 
-
+from sqlalchemy import desc
 @app.get("/getgallery/")
-async def getgallery():
+async def getgallery(authorization: str = Header(None)):
+    #result=await Auhtentication(authorization,password_hash)
     try:
-        galleries = db.query(Gallery).all()
+        galleries = db.query(Gallery).order_by(desc(Gallery.id)).all()
         print(galleries[0])
         print(f"type:{type(galleries[0])}")
         gallery_data=[]
         for gallery in galleries:
-            d= {"id": gallery.id,"name": gallery.name,"site": gallery.site,"square_feet": gallery.square_feet,"image_url": gallery.image_url
+            d= {"id": gallery.id,"name": gallery.name,"site": gallery.site,"square_feet": gallery.square_feet,"image_url": gallery.image_url,"date":gallery.date
             }
             gallery_data.append(d)
             # print(f"ID: {gallery.id}, Name: {gallery.name}, Site: {gallery.site}, Sqft: {gallery.square_feet}, Image URL: {gallery.image_url}")
-
     except Exception as e:
         print("Error:", e)
 
     finally:
         db.close()
 
-    return {"message": f"gallery:{gallery_data}"}
+    return {"message": gallery_data}
+
+
+
+class GalleryDeleteRequest(BaseModel):
+    gallery_id: int
+
+@app.post("/deletegallery/")
+async def deletegallery(data: GalleryDeleteRequest,authorization: str = Header(None)):
+    try:
+        gallery_to_delete = db.query(Gallery).filter(Gallery.id == data.gallery_id).first()
+        if gallery_to_delete:
+            db.delete(gallery_to_delete)
+            db.commit()
+            print(f"Gallery with ID {data.gallery_id} deleted successfully.")
+            return {"message": f"Gallery with ID {data.gallery_id} deleted successfully."}
+
+        else:
+            print(f"Gallery with ID {data.gallery_id} not found.")
+            raise HTTPException(status_code=401, detail=f"Gallery with ID {data.gallery_id} not found.")
+    
+    except Exception as e:
+        print("Error while deleting:", e)
+        db.rollback()
+        raise HTTPException(status_code=401, detail=f"{e}")
+     
+    finally:
+        db.close()

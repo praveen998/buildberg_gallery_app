@@ -25,5 +25,6 @@ class Gallery(Base):
     square_feet = Column(Integer, nullable=False)
     name = Column(String(100), nullable=False)
     image_url=Column(String(155), nullable=False)
-
+    date=Column(String(50), nullable=False)
+    
 Base.metadata.create_all(engine)
