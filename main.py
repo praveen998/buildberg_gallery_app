@@ -88,6 +88,139 @@ async def uploadimage_to_aws(s3client, S3_BUCKET_NAME, product_img):
 #     except Exception as e:
 #         return False
 
+
+
+
+@app.get("/")
+async def root():
+    return {"message": "Hello, FastAPI!"}
+
+
+from datetime import datetime
+@app.post("/upload_image/")
+async def upload_image(
+    authorization: str = Header(None),
+    site_name: str = Form(...),
+    client_name: str = Form(...),
+    building_square_feet: float = Form(...),
+    date:str=Form(...),
+    product_img: UploadFile = File(...)
+    ): 
+    work_date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+    filename=await uploadimage_to_aws(s3_client,S3_BUCKET_NAME,product_img)
+    print("aws file url:",filename)
+    print(site_name)
+    print(client_name)
+    print(building_square_feet)
+    print(str(work_date_obj))
+    print(product_img.filename)
+    global password_hashProject
+    result=await Auhtentication(authorization,password_hash)
+    if result:
+        try:
+            new_gallery = Gallery(
+            site=site_name,
+            square_feet=building_square_feet,
+            name=client_name,
+            image_url=filename,
+            date=str(work_date_obj)
+            )
+            db.add(new_gallery)
+            db.commit()
+            db.refresh(new_gallery)
+            print("Inserted User ID:", new_gallery.id)
+
+        except Exception as e:
+            db.rollback()  # Rollback if there's an error
+            raise HTTPException(status_code=401, detail=f"Error inserting user:{ e}")
+
+        finally:
+            db.close()  # Always close the session
+
+        return {"message": f"gallery_id:{new_gallery.id}"}
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+from utils import Hashing
+
+@app.post("/adminlogin/")
+async def adminlogin(data:AdminLoginRequest):
+    global password_hash
+    username = data.username
+    password = data.password
+    if username != os.getenv("admin_username") or password != os.getenv("admin_password"):
+        print('not valid')
+        raise HTTPException(status_code=401, detail="Invalid_credentials")
+
+   # hashed=await Hashing.hash_password(password)
+    hashed=await Hashing.generate_random_hash()
+    password_hash=hashed
+    return {"message": "Login successful", "hash": hashed }
+
+
+@app.get("/gethash")
+async def gethash():
+    global password_hash
+    return {"hash": password_hash}
+
+
+from utils import Auhtentication
+@app.post("/logout/")
+async def logout(authorization: str = Header(None)):
+    global password_hash
+    result=await Auhtentication(authorization,password_hash)
+    print(result)
+    if result:
+        password_hash=None
+        return {"message": "Logout successful"} 
+
+
+from utils import Auhtentication
+@app.post("/validate_token/")
+async def validate_token(authorization: str = Header(None)):
+    global password_hash
+    result=await Auhtentication(authorization,password_hash)
+    print(result)
+    if result:
+        return {"message": "Token is valid"} 
+    
+
+
+@app.get("/gethash")
+async def gethash():
+    global password_hash
+    return {"hash": password_hash}
+
+from sqlalchemy import desc
+@app.get("/getgallery/")
+async def getgallery():
+    #result=await Auhtentication(authorization,password_hash)
+    gallery_data=[]
+    try:
+        galleries = db.query(Gallery).order_by(desc(Gallery.id)).all()
+        print(galleries[0])
+        print(f"type:{type(galleries[0])}")
+        
+        for gallery in galleries:
+            d= {"id": gallery.id,"name": gallery.name,"site": gallery.site,"square_feet": gallery.square_feet,"image_url": gallery.image_url,"date":gallery.date
+            }
+            gallery_data.append(d)
+            # print(f"ID: {gallery.id}, Name: {gallery.name}, Site: {gallery.site}, Sqft: {gallery.square_feet}, Image URL: {gallery.image_url}")
+    except Exception as e:
+        print("Error:", e)
+
+    finally:
+        db.close()
+
+    return {"message": gallery_data}
+
+
+
+
 async def delete_img_from_aws(s3client, S3_BUCKET_NAME, filename):
     try:
         # Extract just the file name
@@ -113,137 +246,40 @@ async def delete_img_from_aws(s3client, S3_BUCKET_NAME, filename):
     return False
 
 
-@app.get("/")
-async def root():
-    return {"message": "Hello, FastAPI!"}
-
-
-from datetime import datetime
-@app.post("/upload_image/")
-async def upload_image(
-    site_name: str = Form(...),
-    client_name: str = Form(...),
-    building_square_feet: float = Form(...),
-    date:str=Form(...),
-    product_img: UploadFile = File(...)
-    ): 
-    work_date_obj = datetime.strptime(date, "%Y-%m-%d").date()
-    #filename=await uploadimage_to_aws(s3_client,S3_BUCKET_NAME,product_img)
-    #print("aws file url:",filename)
-    print(site_name)
-    print(client_name)
-    print(building_square_feet)
-    print(str(work_date_obj))
-    print(product_img.filename)
-
-    try:
-        new_gallery = Gallery(
-        site=site_name,
-        square_feet=building_square_feet,
-        name=client_name,
-        image_url=product_img.filename,
-        date=str(work_date_obj)
-        )
-        db.add(new_gallery)
-        db.commit()
-        db.refresh(new_gallery)
-        print("Inserted User ID:", new_gallery.id)
-
-    except Exception as e:
-        db.rollback()  # Rollback if there's an error
-        raise HTTPException(status_code=401, detail=f"Error inserting user:{ e}")
-
-    finally:
-        db.close()  # Always close the session
-
-    return {"message": f"gallery_id:{new_gallery.id}"}
-
-
-class AdminLoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-from utils import Hashing
-
-@app.post("/adminlogin/")
-async def adminlogin(data:AdminLoginRequest):
-    global password_hash
-    username = data.username
-    password = data.password
-    if username != os.getenv("admin_username") or password != os.getenv("admin_password"):
-        raise HTTPException(status_code=401, detail="Invalid_credentials")
-
-    hashed=await Hashing.hash_password(password)
-    password_hash=hashed
-    return {"message": "Login successful", "hash": hashed }
-
-
-@app.get("/gethash")
-async def gethash():
-    global password_hash
-    return {"hash": password_hash}
-
-
-from utils import Auhtentication
-@app.post("/validate_token/")
-async def validate_token(authorization: str = Header(None)):
-    global password_hash
-    result=await Auhtentication(authorization,password_hash)
-    print(result)
-    return result
-
-
-@app.get("/gethash")
-async def gethash():
-    global password_hash
-    return {"hash": password_hash}
-
-from sqlalchemy import desc
-@app.get("/getgallery/")
-async def getgallery(authorization: str = Header(None)):
-    #result=await Auhtentication(authorization,password_hash)
-    try:
-        galleries = db.query(Gallery).order_by(desc(Gallery.id)).all()
-        print(galleries[0])
-        print(f"type:{type(galleries[0])}")
-        gallery_data=[]
-        for gallery in galleries:
-            d= {"id": gallery.id,"name": gallery.name,"site": gallery.site,"square_feet": gallery.square_feet,"image_url": gallery.image_url,"date":gallery.date
-            }
-            gallery_data.append(d)
-            # print(f"ID: {gallery.id}, Name: {gallery.name}, Site: {gallery.site}, Sqft: {gallery.square_feet}, Image URL: {gallery.image_url}")
-    except Exception as e:
-        print("Error:", e)
-
-    finally:
-        db.close()
-
-    return {"message": gallery_data}
-
-
-
 class GalleryDeleteRequest(BaseModel):
     gallery_id: int
+    gallery_url: str
 
 @app.post("/deletegallery/")
 async def deletegallery(data: GalleryDeleteRequest,authorization: str = Header(None)):
-    try:
-        gallery_to_delete = db.query(Gallery).filter(Gallery.id == data.gallery_id).first()
-        if gallery_to_delete:
-            db.delete(gallery_to_delete)
-            db.commit()
-            print(f"Gallery with ID {data.gallery_id} deleted successfully.")
-            return {"message": f"Gallery with ID {data.gallery_id} deleted successfully."}
+    global password_hash
+    result=await Auhtentication(authorization,password_hash)
 
+    if result:
+        print('imageurl:',data.gallery_url)
+        delete=delete_img_from_aws(s3_client,S3_BUCKET_NAME,data.gallery_url)
+        if delete:
+            try:
+                gallery_to_delete = db.query(Gallery).filter(Gallery.id == data.gallery_id).first()
+                if gallery_to_delete:
+                    db.delete(gallery_to_delete)
+                    db.commit()
+                    print(f"Gallery with ID {data.gallery_id} deleted successfully.")
+                    return {"message": f"Gallery with ID {data.gallery_id} deleted successfully."}
+
+                else:
+                    print(f"Gallery with ID {data.gallery_id} not found.")
+                    raise HTTPException(status_code=401, detail=f"Gallery with ID {data.gallery_id} not found.")
+            
+            except Exception as e:
+                print("Error while deleting:", e)
+                db.rollback()
+                raise HTTPException(status_code=401, detail=f"{e}")
+            
+            finally:
+                db.close()
         else:
-            print(f"Gallery with ID {data.gallery_id} not found.")
-            raise HTTPException(status_code=401, detail=f"Gallery with ID {data.gallery_id} not found.")
-    
-    except Exception as e:
-        print("Error while deleting:", e)
-        db.rollback()
-        raise HTTPException(status_code=401, detail=f"{e}")
-     
-    finally:
-        db.close()
+            raise HTTPException(status_code=401, detail=f"could not delete Gallery image")
+
+
+

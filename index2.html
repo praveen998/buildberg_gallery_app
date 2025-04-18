@@ -87,7 +87,7 @@
           }
           
           try {
-            const response = await axios.post('http://localhost:8000/validate_token/', {}, {
+            const response = await axios.post('http://localhost:8000/logout/', {}, {
               headers: {
                 Authorization: `Bearer ${token}`
               }
@@ -119,6 +119,7 @@
             });
 
             this.message = response.data.message;
+            alert(this.message);
             this.hash = response.data.hash;
 
             // Store the hash in sessionStorage

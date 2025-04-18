@@ -1,6 +1,7 @@
 from starlette.concurrency import run_in_threadpool
 import bcrypt
-
+import secrets
+import hashlib
 
 class Hashing:
     @staticmethod
@@ -24,6 +25,16 @@ class Hashing:
             # You can log the exception here if needed
             print(f"Error verifying password: {e}")
             return False
+        
+    @staticmethod
+    async def generate_random_hash():
+        # Generate a secure random string
+        random_string = secrets.token_hex(32)  # 64-character hex string
+
+        # Hash it using SHA256
+        hash_object = hashlib.sha256(random_string.encode())
+        return hash_object.hexdigest()
+
 
 
 # import asyncio
@@ -41,4 +52,8 @@ async def Auhtentication(authorization:str,password_hash):
     token = authorization.split(" ")[1]
     if token != password_hash:
         raise HTTPException(status_code=401, detail="Invalid token")
-    return {"message": "Token is valid"}    
+    return True   
+
+
+
+
