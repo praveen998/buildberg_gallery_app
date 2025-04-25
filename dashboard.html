@@ -149,17 +149,15 @@
             <div class="text-center mb-4">
                 <div class="d-flex flex-column flex-md-row justify-content-center align-items-center">
                     <button class="btn btn-primary w-md-auto mb-2 mb-md-0 me-md-2"
-                        @click="activeMenu = 'Gallery Update'" style="margin-right: 10px;">Gallery Update</button>
+                        @click="activeMenu = 'Gallery Update'" style="margin-right: 10px;">Gallery Add</button>
                     <button class="btn btn-primary  w-md-auto mb-2 mb-md-0 me-md-2"
-                        @click="activeMenu = 'Gallery Delete'" style="margin-right: 10px;">Gallery Delete</button>
+                        @click="activeMenu = 'Gallery Delete'" style="margin-right: 10px;">Gallery Delete </button>
                     <button class="btn btn-danger w-md-auto" @click="logout">Logout</button>
                 </div>
             </div>
 
 
             <div v-if="activeMenu === 'Gallery Update'" class="card p-4 shadow-sm mb-3">
-
-
                 <div class="row tm-mb-50 justify-content-center">
                     <div class="col-lg-6 col-12 mb-5">
                         <h2 class="tm-text-primary mb-5 text-center">Add New Project</h2>
@@ -224,17 +222,59 @@
                                     <th>Actions</th>
                                 </tr>
                             </thead>
+
                             <tbody>
                                 <tr v-for="gallery in galleries" :key="gallery.id">
                                     <td>{{ gallery.id }}</td>
-                                    <td>{{ gallery.name }}</td>
-                                    <td>{{ gallery.site }}</td>
-                                    <td>{{ gallery.square_feet }}</td>
-                                    <td><a href="#"
-                                            @click.prevent="openImageDialog(gallery.image_url)">View</a></td>
-                                    <td>{{ gallery.date }}</td>
-                                    <td> <button class="btn btn-danger w-md-auto"
-                                            @click="deleteGallery(gallery.id,gallery.image_url)">Delete</button>
+
+                                    <!-- Conditional input or text for name -->
+                                    <td>
+                                        <input v-if="gallery.isEditing" v-model="gallery.name" class="form-control" />
+                                        <span v-else>{{ gallery.name }}</span>
+                                    </td>
+
+                                    <td>
+                                        <input v-if="gallery.isEditing" v-model="gallery.site" class="form-control" />
+                                        <span v-else>{{ gallery.site }}</span>
+                                    </td>
+
+                                    <td>
+                                        <input v-if="gallery.isEditing" v-model="gallery.square_feet"
+                                            class="form-control" />
+                                        <span v-else>{{ gallery.square_feet }}</span>
+                                    </td>
+
+                                    <td>
+                                        <input v-if="gallery.isEditing" type="file"
+                                            @change="handleFileUpload($event, gallery)" class="form-control" />
+
+                                        <span v-else>
+                                            <a href="#" @click.prevent="openImageDialog(gallery.image_url)">View</a>
+                                        </span>
+
+                                    </td>
+
+                                    <td>
+                                        <input v-if="gallery.isEditing" type="date" v-model="gallery.date"
+                                            class="form-control" />
+                                        <span v-else>{{ gallery.date }}</span>
+                                    </td>
+
+                                    <td>
+                                        <template v-if="gallery.isEditing">
+                                            <button class="btn btn-success me-1"
+                                                @click="saveEdit(gallery)">Save</button>
+                                            <button class="btn btn-secondary"
+                                                @click="cancelEdit(gallery)">Cancel</button>
+                                        </template>
+
+                                        <template v-else>
+                                            <button class="btn btn-primary me-1"
+                                                @click="gallery.isEditing = true">Update</button>
+
+                                            <button class="btn btn-danger"
+                                                @click="deleteGallery(gallery.id, gallery.image_url)">Delete</button>
+                                        </template>
                                     </td>
                                 </tr>
                             </tbody>
@@ -272,15 +312,17 @@
                         client_name: '',
                         date: '',
                         product_img: null,
-
                     },
+
                     message: '',
                     galleries: [],
                     showDialog: false,
                     currentImage: '',
-                    delete_message: ''
+                    delete_message: '',
+                    updates_image:''
                 }
             },
+
             watch: {
                 activeMenu(newVal) {
                     if (newVal === 'Gallery Delete') {
@@ -288,13 +330,38 @@
                     }
                 }
             },
+
             mounted() {
                 if (this.activeMenu === 'Gallery Delete') {
                     this.fetchGalleries()
                 }
             },
+
             methods: {
-                async deleteGallery(id,image_url) {
+
+                async handleFileUpload(event, gallery) {
+                    const file = event.target.files[0];  
+                    if (file) {
+                        console.log("Uploaded image name:", String(file.name));
+                        this.updates_image=String(file.name);
+                    }
+                },
+
+                async saveEdit(gallery) 
+                {
+                    gallery.isEditing = false;
+                    gallery.image_url=this.updates_image;
+                    console.log("Saving gallery:", this.updates_image);
+                    // alert(`Saving gallery: \nID: ${gallery.id}\nName: ${gallery.name}\nSite: ${gallery.site}\nSquare Feet: ${gallery.square_feet}\nDate: ${gallery.date}\nImage: ${gallery.image_url}`);
+                    alert(`${this.updates_image}`);
+                },
+
+                async cancelEdit(gallery) {
+                    // Optionally revert values if needed
+                    gallery.isEditing = false;
+                },
+
+                async deleteGallery(id, image_url) {
                     if (confirm("Are you sure you want to delete this gallery?")) {
 
                         const token = sessionStorage.getItem("adminHash");
@@ -303,15 +370,17 @@
                         }
                         try {
                             const response = await axios.post('http://127.0.0.1:8000/deletegallery/',
-                                { gallery_id: id,
-                                gallery_url:image_url
-                                 },
+                                {
+                                    gallery_id: id,
+                                    gallery_url: image_url
+                                },
                                 {
                                     headers: {
                                         Authorization: `Bearer ${token}`
                                     }
                                 }
                             );
+
                             this.galleries = this.galleries.filter(g => g.id !== id);
                             this.delete_message = "Project deleted successfully!";
                             alert(this.delete_message);
@@ -334,14 +403,17 @@
 
                     }
                 },
+
                 async openImageDialog(imageUrl) {
                     this.currentImage = imageUrl
                     this.showDialog = true
                 },
+
                 async closeImageDialog() {
                     this.showDialog = false
                     this.currentImage = ''
                 },
+
                 async fetchGalleries() {
                     axios.get('http://127.0.0.1:8000/getgallery/')
                         .then(res => {
@@ -356,6 +428,7 @@
                 async handleFileUpload(event) {
                     this.form.product_img = event.target.files[0];
                 },
+
                 async submitForm() {
                     const formData = new FormData();
                     formData.append('site_name', this.form.site_name);
