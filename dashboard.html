@@ -207,6 +207,7 @@
             <div v-if="activeMenu === 'Gallery Delete'" class="card p-4 shadow-sm mb-3 gallery-delete-section">
                 <h4>Gallery Delete</h4>
                 <p class="mb-3">Here you can view and manage your galleries.</p>
+                <h2 v-if="update_status" class="text-success">{{update_status}}</h2>
 
                 <div class="table-wrapper">
                     <div class="table-responsive">
@@ -246,7 +247,7 @@
 
                                     <td>
                                         <input v-if="gallery.isEditing" type="file"
-                                            @change="handleFileUpload($event, gallery)" class="form-control" />
+                                            @change="updatehandleFileUpload($event, gallery)" class="form-control" />
 
                                         <span v-else>
                                             <a href="#" @click.prevent="openImageDialog(gallery.image_url)">View</a>
@@ -269,7 +270,7 @@
                                         </template>
 
                                         <template v-else>
-                                            <button class="btn btn-primary me-1"
+                                            <button class="btn btn-success "
                                                 @click="gallery.isEditing = true">Update</button>
 
                                             <button class="btn btn-danger"
@@ -319,7 +320,10 @@
                     showDialog: false,
                     currentImage: '',
                     delete_message: '',
-                    updates_image:''
+                    updates_image_url: '',
+                    updates_image: null,
+                    update_status:''
+
                 }
             },
 
@@ -339,21 +343,72 @@
 
             methods: {
 
-                async handleFileUpload(event, gallery) {
-                    const file = event.target.files[0];  
+                async updatehandleFileUpload(event, gallery) {
+                    const file = event.target.files[0];
                     if (file) {
-                        console.log("Uploaded image name:", String(file.name));
-                        this.updates_image=String(file.name);
+                        this.updates_image = file;
+                    }
+                    else {
+                        console.log("image url:", gallery.image_url);
+                        this.updates_image_url = gallery.image_url;
                     }
                 },
 
-                async saveEdit(gallery) 
-                {
+                async saveEdit(gallery) {
+
                     gallery.isEditing = false;
-                    gallery.image_url=this.updates_image;
-                    console.log("Saving gallery:", this.updates_image);
-                    // alert(`Saving gallery: \nID: ${gallery.id}\nName: ${gallery.name}\nSite: ${gallery.site}\nSquare Feet: ${gallery.square_feet}\nDate: ${gallery.date}\nImage: ${gallery.image_url}`);
-                    alert(`${this.updates_image}`);
+                    this.updates_image_url = gallery.image_url;
+                    const formData = new FormData();
+                    formData.append('id',gallery.id);
+                    formData.append('site_name', gallery.site);
+                    formData.append('building_square_feet', gallery.square_feet);
+                    formData.append('client_name', gallery.name);
+                    formData.append('date', gallery.date);
+                    formData.append('image_url', this.updates_image_url);
+                    if (this.updates_image) {
+                        formData.append('product_img', this.updates_image);
+                    }
+
+                    const token = sessionStorage.getItem("adminHash");
+                    if (!token) {
+                        return;
+                    }
+                    this.update_status="updating process...";
+
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/update_gallery/', {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                Authorization: `Bearer ${token}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            alert("Gallery updated success..");
+                            this.update_status='';
+                            updates_image_url='';
+                            updates_image=null;
+                            window.location.reload();
+
+                        }
+                        else {
+                            const errorData = await response.json();
+                        }
+
+                    } catch (error) {
+                        alert("not updated");
+                    }
+
+                    // if (this.updates_image === null){
+                    //     alert(`Saving gallery: \nID: ${gallery.id}\nName: ${gallery.name}\nSite: ${gallery.site}\nSquare Feet: ${gallery.square_feet}\nDate: ${gallery.date}\nImage: ${this.updates_image_url}`);
+                    // }
+
+                    // else{
+                    //     formData.append('product_img',this.updates_image);
+                    //     alert("no image updation");
+                    // }
+
                 },
 
                 async cancelEdit(gallery) {

@@ -18,3 +18,13 @@ curl -X GET http://127.0.0.1:8000/getgallery/
 curl -X POST http://127.0.0.1:8000/deletegallery/ \
   -H "Content-Type: application/json" \
   -d '{"gallery_id": 1}'
+
+
+
+office address: Arenco Building 4, G-14, DIP - 1, Dubai, UAE
+
+office numbers:
+  971 566688164
+  971 554299821
+  Both numbers
+

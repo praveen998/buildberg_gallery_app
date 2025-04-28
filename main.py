@@ -79,6 +79,32 @@ async def uploadimage_to_aws(s3client, S3_BUCKET_NAME, product_img):
     return None
 
 
+
+async def delete_img_from_aws(s3client, S3_BUCKET_NAME, filename):
+    try:
+        # Extract just the file name
+        file_key = filename.split("/")[-1]
+        file_key = f"buildberg/{file_key}"
+
+        # Run the delete_object call in FastAPI's threadpool
+        await run_in_threadpool(
+            s3client.delete_object,
+            Bucket=S3_BUCKET_NAME,
+            Key=file_key
+        )
+
+        return True
+
+    except botocore.exceptions.ClientError as e:
+        print(f"❌ AWS client error: {e}")
+    except botocore.exceptions.BotoCoreError as e:
+        print(f"❌ Boto3 core error: {e}")
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+    
+    return False
+
+
 # async def delete_img_from_aws(s3client,S3_BUCKET_NAME,filename):
 #     try:
 #         file_name = file_name.split("/")[-1]
@@ -94,6 +120,84 @@ async def uploadimage_to_aws(s3client, S3_BUCKET_NAME, product_img):
 @app.get("/")
 async def root():
     return {"message": "Hello, FastAPI!"}
+
+
+from datetime import datetime
+from typing import Optional
+
+@app.post("/update_gallery/")
+async def update_gallery(
+    authorization: str = Header(None),
+    id: int = Form(...),
+    site_name: str = Form(...),
+    client_name: str = Form(...),
+    building_square_feet: float = Form(...),
+    date: str = Form(...),
+    image_url: str = Form(...),
+    product_img: Optional[UploadFile] = File(None)
+    ):
+
+    work_date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+
+    print(id)
+    print(site_name)
+    print(client_name)
+    print(building_square_feet)
+    print(str(work_date_obj))
+    print(image_url)
+
+    if product_img != None:
+        print(product_img.filename)
+
+    global password_hash
+    result=await Auhtentication(authorization,password_hash)
+
+    if result:
+        if product_img:
+            print("yes product image has")
+            delete=await delete_img_from_aws(s3_client,S3_BUCKET_NAME,image_url)
+            filename=await uploadimage_to_aws(s3_client,S3_BUCKET_NAME,product_img)
+            if delete:
+                try:
+                    db.query(Gallery).filter(Gallery.id == id).update({
+                    Gallery.site:site_name,
+                    Gallery.name:client_name,
+                    Gallery.square_feet:building_square_feet,
+                    Gallery.image_url:filename,
+                    Gallery.date:str(work_date_obj)
+                    })
+                    db.commit()
+
+                except Exception as e:
+                    print("Error while updating:", e)
+                    db.rollback()
+                    raise HTTPException(status_code=401, detail=f"{e}")
+                
+                finally:
+                    db.close()
+
+        else:
+            print("no product image")
+            try:
+                db.query(Gallery).filter(Gallery.id == id).update({
+                    Gallery.site:site_name,
+                    Gallery.name:client_name,
+                    Gallery.square_feet:building_square_feet,
+                    Gallery.image_url:image_url,
+                    Gallery.date:str(work_date_obj)
+                })
+                db.commit()
+
+            except Exception as e:
+                print("Error while updating:", e)
+                db.rollback()
+                raise HTTPException(status_code=401, detail=f"{e}")
+            
+            finally:
+                db.close()
+
+        return  {"message": "updated"}
+
 
 
 from datetime import datetime
@@ -114,7 +218,7 @@ async def upload_image(
     print(building_square_feet)
     print(str(work_date_obj))
     print(product_img.filename)
-    global password_hashProject
+    global password_hash
     result=await Auhtentication(authorization,password_hash)
     if result:
         try:
@@ -125,9 +229,11 @@ async def upload_image(
             image_url=filename,
             date=str(work_date_obj)
             )
+
             db.add(new_gallery)
             db.commit()
             db.refresh(new_gallery)
+
             print("Inserted User ID:", new_gallery.id)
 
         except Exception as e:
@@ -221,31 +327,6 @@ async def getgallery():
 
 
 
-async def delete_img_from_aws(s3client, S3_BUCKET_NAME, filename):
-    try:
-        # Extract just the file name
-        file_key = filename.split("/")[-1]
-        file_key = f"buildberg/{file_key}"
-
-        # Run the delete_object call in FastAPI's threadpool
-        await run_in_threadpool(
-            s3client.delete_object,
-            Bucket=S3_BUCKET_NAME,
-            Key=file_key
-        )
-
-        return True
-
-    except botocore.exceptions.ClientError as e:
-        print(f"❌ AWS client error: {e}")
-    except botocore.exceptions.BotoCoreError as e:
-        print(f"❌ Boto3 core error: {e}")
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-    
-    return False
-
-
 class GalleryDeleteRequest(BaseModel):
     gallery_id: int
     gallery_url: str
@@ -257,7 +338,7 @@ async def deletegallery(data: GalleryDeleteRequest,authorization: str = Header(N
 
     if result:
         print('imageurl:',data.gallery_url)
-        delete=delete_img_from_aws(s3_client,S3_BUCKET_NAME,data.gallery_url)
+        delete=await delete_img_from_aws(s3_client,S3_BUCKET_NAME,data.gallery_url)
         if delete:
             try:
                 gallery_to_delete = db.query(Gallery).filter(Gallery.id == data.gallery_id).first()
